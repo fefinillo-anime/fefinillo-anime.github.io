@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- Hace que la página se adapte bien al móvil -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Título que sale en la pestaña del navegador -->
+  <title>Fefinillo · Anime en directo</title>
+
+  <style>
+    /* ====== COLORES (cámbialos aquí y cambia toda la página) ====== */
+    :root {
+      --fondo: #0e0e10;        /* negro de Twitch */
+      --barra: #18181b;        /* gris oscuro de las barras de Twitch */
+      --borde: #2f2f35;        /* línea separadora */
+      --texto: #efeff1;        /* texto claro */
+      --morado: #9147ff;       /* morado de Twitch (botón Suscríbete) */
+      --ancho-chat: 340px;     /* ancho de la columna del chat */
+      --alto-barra: 56px;      /* alto de la barra de abajo */
+    }
+
+    /* Quita márgenes por defecto y hace que todo ocupe la pantalla entera */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--fondo);
+      color: var(--texto);
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+      overflow: hidden; /* sin scroll en PC: todo cabe en pantalla */
+    }
+
+    /* ====== ESTRUCTURA: vídeo | chat  arriba,  barra abajo ====== */
+    .pagina {
+      display: grid;
+      grid-template-columns: 1fr var(--ancho-chat);   /* vídeo ocupa lo que sobre, chat fijo */
+      grid-template-rows: 1fr var(--alto-barra);      /* contenido arriba, barra abajo */
+      grid-template-areas:
+        "video chat"
+        "barra barra";
+      height: 100vh;
+      height: 100dvh; /* en móvil evita que la barra del navegador tape cosas */
+    }
+
+    /* ====== ZONA DEL VÍDEO (reproductor de Kick) ====== */
+    .video {
+      grid-area: video;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      min-height: 0;
+    }
+    .video iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    /* ====== ZONA DEL CHAT (chat de Twitch) ====== */
+    .chat {
+      grid-area: chat;
+      border-left: 1px solid var(--borde);
+      background: var(--barra);
+      min-height: 0;
+    }
+    .chat iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    /* ====== BARRA DE ABAJO CON LOS ENLACES ====== */
+    .barra {
+      grid-area: barra;
+      background: var(--barra);
+      border-top: 1px solid var(--borde);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      overflow-x: auto;      /* si no caben (móvil), se deslizan de lado */
+      white-space: nowrap;
+    }
+    .canal {
+      font-weight: 700;
+      margin-right: auto;    /* empuja los botones hacia la derecha */
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .directo {
+      background: #eb0400;   /* rojo "EN DIRECTO" de Twitch */
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Estilo común de todos los botones */
+    .boton {
+      color: var(--texto);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: #2f2f35;
+      transition: filter .15s;
+      flex-shrink: 0;
+    }
+    .boton:hover { filter: brightness(1.3); }
+
+    /* El botón de Suscribirse en morado, como en Twitch */
+    .boton.sub { background: var(--morado); color: #fff; }
+
+    /* ====== MÓVIL: vídeo arriba, chat debajo, barra al final ====== */
+    @media (max-width: 900px) {
+      body { overflow: auto; }
+      .pagina {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr var(--alto-barra);
+        grid-template-areas:
+          "video"
+          "chat"
+          "barra";
+      }
+      .video { aspect-ratio: 16 / 9; }  /* el vídeo mantiene su forma */
+      .chat { border-left: 0; border-top: 1px solid var(--borde); }
+      .canal { display: none; }          /* en móvil ocultamos el nombre para ganar sitio */
+    }
+  </style>
+</head>
+<body>
+  <div class="pagina">
+
+    <!-- REPRODUCTOR DE KICK: aquí se ve el anime + tu cámara (lo que mandas a Kick) -->
+    <div class="video">
+      <iframe
+        src="https://player.kick.com/fefinillo?autoplay=true"
+        allowfullscreen
+        allow="autoplay; fullscreen; picture-in-picture"
+        title="Directo de Fefinillo en Kick">
+      </iframe>
+    </div>
+
+    <!-- CHAT DE TWITCH: es el chat real de tu canal.
+         "parent=" TIENE que ser el dominio exacto donde está la página, si no, no carga. -->
+    <div class="chat">
+      <iframe
+        src="https://www.twitch.tv/embed/fdefefinillo/chat?parent=fefinillo-anime.github.io&darkpopout"
+        title="Chat de Twitch de fdefefinillo">
+      </iframe>
+    </div>
+
+    <!-- BARRA DE ABAJO -->
+    <nav class="barra">
+      <div class="canal">
+        <span class="directo">EN DIRECTO</span>
+        <span>Fefinillo · Domingos de anime</span>
+      </div>
+
+      <!-- target="_blank" = se abre en pestaña nueva, así no se cierra el directo -->
+      <a class="boton sub" href="https://www.twitch.tv/subs/fdefefinillo" target="_blank" rel="noopener">Suscríbete</a>
+      <a class="boton" href="https://www.youtube.com/@Fefinillo" target="_blank" rel="noopener">YouTube</a>
+      <a class="boton" href="https://www.youtube.com/@FdeFefinillo" target="_blank" rel="noopener">YouTube VODs</a>
+      <a class="boton" href="https://x.com/fefinillo" target="_blank" rel="noopener">Twitter</a>
+      <a class="boton" href="https://discord.gg/7Cg3zQ3" target="_blank" rel="noopener">Discord</a>
+      <a class="boton" href="https://www.instagram.com/itsmart.inz/" target="_blank" rel="noopener">Instagram</a>
+      <a class="boton" href="https://www.tiktok.com/@fefinillo" target="_blank" rel="noopener">TikTok</a>
+    </nav>
+
+  </div>
+</body>
+</html>
