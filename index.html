@@ -89,6 +89,12 @@
       align-items: center;
       gap: 8px;
     }
+    /* Tamaño del logo en la barra (súbelo o bájalo cambiando el 40px) */
+    .logo {
+      height: 40px;
+      width: auto;
+      border-radius: 6px;
+    }
     .directo {
       background: #eb0400;   /* rojo "EN DIRECTO" de Twitch */
       color: #fff;
@@ -158,7 +164,9 @@
     <nav class="barra">
       <div class="canal">
         <span class="directo">EN DIRECTO</span>
-        <span>Fefinillo · Domingos de anime</span>
+        <!-- Tu logo: el archivo logo.png tiene que estar en el repositorio, junto a index.html -->
+        <img class="logo" src="logo.png" alt="Logo de Fefinillo">
+        <span>Fefinillo · Tardes de Anime</span>
       </div>
 
       <!-- target="_blank" = se abre en pestaña nueva, así no se cierra el directo -->
@@ -166,7 +174,7 @@
       <a class="boton" href="https://www.youtube.com/@Fefinillo" target="_blank" rel="noopener">YouTube</a>
       <a class="boton" href="https://www.youtube.com/@FdeFefinillo" target="_blank" rel="noopener">YouTube VODs</a>
       <a class="boton" href="https://x.com/fefinillo" target="_blank" rel="noopener">Twitter</a>
-      <a class="boton" href="https://discord.gg/7Cg3zQ3" target="_blank" rel="noopener">Discord</a>
+      <a class="boton" href="https://discord.gg/36pqc28FSh" target="_blank" rel="noopener">Discord</a>
       <a class="boton" href="https://www.instagram.com/itsmart.inz/" target="_blank" rel="noopener">Instagram</a>
       <a class="boton" href="https://www.tiktok.com/@fefinillo" target="_blank" rel="noopener">TikTok</a>
     </nav>
