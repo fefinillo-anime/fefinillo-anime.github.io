@@ -100,7 +100,30 @@
     /* Cajas de los dos chats oficiales */
     .zona-chats { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .caja { display: flex; flex-direction: column; min-height: 0; }
-    .caja iframe { flex: 1; width: 100%; border: 0; display: block; }
+
+    /* ====== RECORTE DE LOS CHATS (pestaña Todo) ======
+       No podemos tocar el interior de los chats, así que los "recortamos" desde fuera:
+       el marco esconde lo que sobresale por arriba (cabecera) y por abajo (caja de escribir).
+       Si Twitch o Kick cambian su diseño y se ve un trozo de más o de menos,
+       ajusta estos 4 números (en píxeles). */
+    :root {
+      --twitch-cabecera: 50px;  /* alto de la cabecera "Chat del stream" de Twitch */
+      --twitch-escribir: 100px; /* alto de la caja de escribir + fila de puntos de Twitch */
+      --kick-cabecera: 45px;    /* alto de la cabecera "Chat" de Kick */
+      --kick-escribir: 105px;   /* alto de la caja de escribir + botón Chatear de Kick */
+    }
+    .marco { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+    .marco iframe {
+      position: absolute; left: 0; width: 100%; border: 0; display: block;
+      top: calc(-1 * var(--quitar-arriba, 0px));
+      height: calc(100% + var(--quitar-arriba, 0px) + var(--quitar-abajo, 0px));
+    }
+    /* Chat de abajo (donde se escribe): solo se quita la cabecera */
+    .modo-todo #caja-twitch.caja-abajo .marco { --quitar-arriba: var(--twitch-cabecera); }
+    .modo-todo #caja-kick.caja-abajo .marco   { --quitar-arriba: var(--kick-cabecera); }
+    /* Chat de arriba (solo lectura): se quitan la cabecera y la caja de escribir */
+    .modo-todo #caja-twitch.caja-arriba .marco { --quitar-arriba: var(--twitch-cabecera); --quitar-abajo: var(--twitch-escribir); }
+    .modo-todo #caja-kick.caja-arriba .marco   { --quitar-arriba: var(--kick-cabecera);   --quitar-abajo: var(--kick-escribir); }
     /* Etiqueta pequeña encima del chat de arriba en la pestaña Todo */
     .etiqueta { display: none; font-size: 11px; padding: 2px 8px; }
     #caja-twitch .etiqueta { color: #bf94ff; }
@@ -209,19 +232,23 @@
              "parent=" TIENE que ser el dominio exacto donde está la página, si no, no carga. -->
         <div class="caja" id="caja-twitch">
           <div class="etiqueta">Chat de Twitch</div>
-          <iframe
-            src="https://www.twitch.tv/embed/fdefefinillo/chat?parent=fefinillo-anime.github.io&darkpopout"
-            title="Chat de Twitch de fdefefinillo">
-          </iframe>
+          <div class="marco">
+            <iframe
+              src="https://www.twitch.tv/embed/fdefefinillo/chat?parent=fefinillo-anime.github.io&darkpopout"
+              title="Chat de Twitch de fdefefinillo">
+            </iframe>
+          </div>
         </div>
 
         <!-- CHAT DE KICK: es el chat real de tu canal de Kick -->
         <div class="caja" id="caja-kick">
           <div class="etiqueta">Chat de Kick</div>
-          <iframe
-            src="https://kick.com/popout/fefinillo/chat"
-            title="Chat de Kick de Fefinillo">
-          </iframe>
+          <div class="marco">
+            <iframe
+              src="https://kick.com/popout/fefinillo/chat"
+              title="Chat de Kick de Fefinillo">
+            </iframe>
+          </div>
         </div>
       </div>
     </div>
