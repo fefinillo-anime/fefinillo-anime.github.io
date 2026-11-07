@@ -115,22 +115,60 @@
     /* Marco de cada chat: morado para Twitch y verde para Kick,
        para que se vea dónde empieza uno y acaba el otro */
     .marco {
-      flex: 1; position: relative; overflow: hidden; min-height: 0;
-      margin: 4px; border: 2px solid; border-radius: 6px;
+      flex: 1; min-height: 0; margin: 4px; padding: 2px;
+      border: 2px solid; border-radius: 6px;
+      display: flex; flex-direction: column;
     }
     #caja-twitch .marco { border-color: var(--morado); }
     #caja-kick .marco   { border-color: var(--verde-oscuro); }
-    .marco iframe {
-      position: absolute; left: 0; width: 100%; border: 0; display: block;
-      top: calc(-1 * var(--quitar-arriba, 0px));
-      height: calc(100% + var(--quitar-arriba, 0px) + var(--quitar-abajo, 0px));
-    }
-    /* Chat de abajo (donde se escribe): solo se quita la cabecera */
-    .modo-todo #caja-twitch.caja-abajo .marco { --quitar-arriba: var(--twitch-cabecera); }
-    .modo-todo #caja-kick.caja-abajo .marco   { --quitar-arriba: var(--kick-cabecera); }
-    /* Chat de arriba (solo lectura): se quitan la cabecera y la caja de escribir */
+    /* Sin recorte: el chat se ve entero, tal cual */
+    .marco iframe { flex: 1; width: 100%; border: 0; display: block; }
+
+    /* ¿Qué chats se recortan?
+       - Twitch: SOLO cuando está arriba en "Todo" (solo lectura). El chat de Twitch donde se
+         escribe NO se puede recortar: Twitch lo detecta y bloquea el chat a ti y a tus mods
+         ("otro elemento tapa la ventana del chat").
+       - Kick: siempre (cabecera y caja de escribir), porque en Kick se escribe con el botón
+         "Escribir en Kick": su inicio de sesión no funciona dentro de otra página. */
     .modo-todo #caja-twitch.caja-arriba .marco { --quitar-arriba: var(--twitch-cabecera); --quitar-abajo: var(--twitch-escribir); }
-    .modo-todo #caja-kick.caja-arriba .marco   { --quitar-arriba: var(--kick-cabecera);   --quitar-abajo: var(--kick-escribir); }
+    #caja-kick .marco { --quitar-arriba: var(--kick-cabecera); --quitar-abajo: var(--kick-escribir); }
+
+    .modo-todo #caja-twitch.caja-arriba .marco,
+    #caja-kick .marco { position: relative; overflow: hidden; }
+    .modo-todo #caja-twitch.caja-arriba .marco iframe,
+    #caja-kick .marco iframe {
+      position: absolute; left: 0; width: 100%;
+      top: calc(-1 * var(--quitar-arriba));
+      height: calc(100% + var(--quitar-arriba) + var(--quitar-abajo));
+    }
+
+    /* ====== ESCRIBIR EN KICK DESDE LA PÁGINA ======
+       Solo sale donde toca escribir en Kick (abajo en "Todo" y en la pestaña Kick). */
+    .kick-escribir { display: none; margin: 0 4px 4px; }
+    .modo-kick .kick-escribir,
+    .modo-todo #caja-kick.caja-abajo .kick-escribir { display: block; }
+
+    .kick-conectar {
+      width: 100%; padding: 8px; border: 0; border-radius: 6px;
+      background: var(--verde-oscuro); color: #fff;
+      font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .kick-conectar:hover { filter: brightness(1.2); }
+    .kick-form { display: flex; gap: 6px; }
+    .kick-form[hidden], .kick-conectar[hidden] { display: none; }
+    .kick-form input {
+      flex: 1; min-width: 0; padding: 8px 10px; border-radius: 6px;
+      border: 1px solid #3a3a44; background: #0e0e10; color: var(--texto); font: inherit; font-size: 13px;
+    }
+    .kick-form input:focus { outline: none; border-color: var(--verde); }
+    .kick-form button {
+      padding: 0 12px; border: 0; border-radius: 6px; background: var(--verde); color: #0e0e10;
+      font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .kick-form button:disabled { opacity: .6; cursor: default; }
+    .kick-info { font-size: 11px; color: var(--texto-suave); margin-top: 4px; min-height: 14px; }
+    .kick-info a { color: var(--texto-suave); }
+    .kick-info .error { color: #ff6b6b; }
     /* Etiqueta pequeña encima del chat de arriba en la pestaña Todo */
     .etiqueta { display: none; font-size: 11px; padding: 4px 8px 0; }
     #caja-twitch .etiqueta { color: #bf94ff; }
@@ -256,6 +294,15 @@
               title="Chat de Kick de Fefinillo">
             </iframe>
           </div>
+          <!-- Escribir en Kick: primero "Conectar" (una sola vez), luego la caja de escribir -->
+          <div class="kick-escribir">
+            <button class="kick-conectar" id="kick-conectar">Conectar con Kick para escribir</button>
+            <form class="kick-form" id="kick-form" hidden>
+              <input id="kick-texto" maxlength="500" placeholder="Enviar un mensaje en Kick" autocomplete="off">
+              <button type="submit" id="kick-enviar">Chatear</button>
+            </form>
+            <div class="kick-info" id="kick-info"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -324,6 +371,111 @@
     }));
 
     pintar();
+
+    // ====== ESCRIBIR EN KICK (conexión oficial con Kick) ======
+    const KICK = {
+      clientId: '01M6W5J7SS3QC0QAGWR6BAJYD1',                          // Client ID de tu app de Kick (no es secreto)
+      servidor: 'https://fefinillo-kick.vercel.app/api/kick',          // ⬅️ tu mini servidor de Vercel
+      redirect: 'https://fefinillo-anime.github.io/kick-callback.html' // igual que en la app de Kick
+    };
+    const kConectar = document.getElementById('kick-conectar');
+    const kForm = document.getElementById('kick-form');
+    const kTexto = document.getElementById('kick-texto');
+    const kEnviar = document.getElementById('kick-enviar');
+    const kInfo = document.getElementById('kick-info');
+
+    // La conexión de cada viewer se guarda en su propio navegador
+    function leerSesion() { try { return JSON.parse(localStorage.getItem('fefi-kick')); } catch (e) { return null; } }
+    function guardarSesion(s) {
+      try { s ? localStorage.setItem('fefi-kick', JSON.stringify(s)) : localStorage.removeItem('fefi-kick'); } catch (e) {}
+    }
+
+    // Muestra "Conectar" o la caja de escribir, según si el viewer está conectado
+    function pintarKick(error) {
+      const s = leerSesion();
+      kConectar.hidden = !!s;
+      kForm.hidden = !s;
+      kInfo.textContent = '';
+      if (error) {
+        const e = document.createElement('span'); e.className = 'error'; e.textContent = error;
+        kInfo.appendChild(e);
+      } else if (s) {
+        kInfo.append('Conectado como ');
+        const b = document.createElement('b'); b.textContent = s.nombre || 'tu cuenta'; kInfo.appendChild(b);
+        kInfo.append(' · ');
+        const salir = document.createElement('a'); salir.href = '#'; salir.textContent = 'desconectar';
+        salir.addEventListener('click', ev => { ev.preventDefault(); guardarSesion(null); pintarKick(); });
+        kInfo.appendChild(salir);
+      }
+    }
+
+    // Utilidades para la seguridad de la conexión (PKCE, lo exige Kick)
+    function b64url(bytes) { return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+    function aleatorio(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return b64url(a); }
+
+    // Botón "Conectar con Kick": abre la pantalla oficial de Kick
+    kConectar.addEventListener('click', async () => {
+      // La ventanita se abre YA (si se abre más tarde, el navegador la bloquea)
+      const ventana = window.open('', 'kick-login', 'width=500,height=720');
+      const verifier = aleatorio(48), state = aleatorio(16);
+      const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+      try { localStorage.setItem('fefi-kick-pkce', JSON.stringify({ verifier, state })); } catch (e) {}
+      const url = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
+        response_type: 'code', client_id: KICK.clientId, redirect_uri: KICK.redirect,
+        scope: 'user:read chat:write', code_challenge: b64url(hash), code_challenge_method: 'S256', state
+      });
+      if (ventana) ventana.location = url; else location.href = url; // si se bloqueó la ventanita, va en esta pestaña
+    });
+
+    // Cuando la ventanita termina, guarda la conexión y esta página se entera sola
+    window.addEventListener('storage', e => { if (e.key === 'fefi-kick') pintarKick(); });
+
+    async function pedir(datos) {
+      const r = await fetch(KICK.servidor, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos)
+      });
+      let j = {}; try { j = await r.json(); } catch (e) {}
+      return { ok: r.ok, status: r.status, j };
+    }
+
+    // Devuelve una conexión válida, renovándola si está a punto de caducar
+    async function sesionValida(forzar) {
+      let s = leerSesion();
+      if (!s) return null;
+      if (forzar || Date.now() > s.caduca - 60000) {
+        const r = await pedir({ accion: 'renovar', refresh_token: s.refresh, nombre: s.nombre });
+        if (!r.ok) { guardarSesion(null); pintarKick('Tu conexión con Kick ha caducado. Vuelve a conectar.'); return null; }
+        s = r.j; guardarSesion(s);
+      }
+      return s;
+    }
+
+    // Enviar un mensaje (botón Chatear o tecla Enter)
+    kForm.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const texto = kTexto.value.trim();
+      if (!texto) return;
+      kEnviar.disabled = true;
+      try {
+        let s = await sesionValida(false);
+        if (!s) return;
+        let r = await pedir({ accion: 'enviar', token: s.access, content: texto });
+        if (r.status === 401) {                 // token caducado: se renueva y se reintenta una vez
+          s = await sesionValida(true);
+          if (!s) return;
+          r = await pedir({ accion: 'enviar', token: s.access, content: texto });
+        }
+        if (r.ok) { kTexto.value = ''; pintarKick(); }
+        else pintarKick(r.j.error || 'No se pudo enviar el mensaje.');
+      } catch (e) {
+        pintarKick('No se pudo contactar con el servidor.');
+      } finally {
+        kEnviar.disabled = false;
+        kTexto.focus();
+      }
+    });
+
+    pintarKick();
   </script>
 </body>
 </html>

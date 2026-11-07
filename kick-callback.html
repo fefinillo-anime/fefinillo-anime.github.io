@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conectando con Kick…</title>
+  <style>
+    body { background: #0e0e10; color: #efeff1; font-family: "Segoe UI", Roboto, Arial, sans-serif;
+           display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;
+           text-align: center; padding: 16px; box-sizing: border-box; }
+    a { color: #53fc18; }
+  </style>
+</head>
+<body>
+  <!-- Esta página es adonde Kick devuelve al viewer tras aceptar los permisos.
+       Termina la conexión y se cierra sola. -->
+  <p id="msg">Conectando con Kick…</p>
+
+  <script>
+    // ⬇️ Si tu proyecto de Vercel tiene otra dirección, cámbiala aquí (y en index.html)
+    const SERVIDOR = 'https://fefinillo-kick.vercel.app/api/kick';
+
+    const msg = document.getElementById('msg');
+    function mostrar(texto) { msg.textContent = texto; }
+    function volver() {
+      // Si se abrió como ventanita, se cierra; si no, vuelve a la página principal
+      if (window.opener) window.close();
+      else location.href = './';
+    }
+
+    (async () => {
+      const p = new URLSearchParams(location.search);
+      let guardado = null;
+      try { guardado = JSON.parse(localStorage.getItem('fefi-kick-pkce')); } catch (e) {}
+
+      if (p.get('error')) { mostrar('Has cancelado la conexión con Kick. Puedes cerrar esta ventana.'); return; }
+      if (!p.get('code') || !guardado || guardado.state !== p.get('state')) {
+        mostrar('Algo no cuadra con la conexión. Cierra esta ventana y vuelve a pulsar "Conectar con Kick".');
+        return;
+      }
+
+      try {
+        const r = await fetch(SERVIDOR, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accion: 'canjear', code: p.get('code'), verifier: guardado.verifier }),
+        });
+        const datos = await r.json();
+        if (!r.ok) { mostrar(datos.error || 'No se pudo conectar con Kick.'); return; }
+
+        try {
+          localStorage.setItem('fefi-kick', JSON.stringify(datos));  // la página principal lo detecta sola
+          localStorage.removeItem('fefi-kick-pkce');
+        } catch (e) {}
+        mostrar('¡Conectado como ' + (datos.nombre || 'tu cuenta') + '! Ya puedes escribir en el chat de Kick.');
+        setTimeout(volver, 1200);
+      } catch (e) {
+        mostrar('No se pudo contactar con el servidor. Inténtalo de nuevo en un rato.');
+      }
+    })();
+  </script>
+</body>
+</html>
