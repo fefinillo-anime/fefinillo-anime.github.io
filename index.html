@@ -169,6 +169,55 @@
     .kick-info { font-size: 11px; color: var(--texto-suave); margin-top: 4px; min-height: 14px; }
     .kick-info a { color: var(--texto-suave); }
     .kick-info .error { color: #ff6b6b; }
+    .kick-info .bien  { color: var(--verde); }
+
+    /* ====== SELECTOR DE EMOTES DE KICK ====== */
+    .kick-form { position: relative; }
+    .kick-form .kick-emote-btn {
+      padding: 0 8px; background: #2f2f35; color: var(--texto); font-size: 17px; font-weight: 400;
+    }
+    .emotes {
+      position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 5;
+      background: var(--barra); border: 1px solid #3a3a44; border-radius: 8px; padding: 8px;
+    }
+    .emotes[hidden] { display: none; }
+    .emotes input {
+      width: 100%; padding: 6px 8px; margin-bottom: 6px; border-radius: 6px;
+      border: 1px solid #3a3a44; background: #0e0e10; color: var(--texto); font: inherit; font-size: 12px;
+    }
+    .emotes-grupos { display: flex; gap: 4px; margin-bottom: 6px; }
+    .emotes-grupos button {
+      flex: 1; padding: 3px 0; border: 0; border-radius: 4px; background: none;
+      color: var(--texto-suave); font: inherit; font-size: 12px; cursor: pointer;
+    }
+    .emotes-grupos button.activa { background: #2f2f35; color: #fff; }
+    .emotes-rejilla {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 2px;
+      max-height: 190px; overflow-y: auto;
+    }
+    .emotes-rejilla button {
+      background: none; border: 0; border-radius: 4px; padding: 4px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .emotes-rejilla button:hover { background: #2f2f35; }
+    .emotes-rejilla img { width: 28px; height: 28px; object-fit: contain; }
+
+    /* ====== PANEL DE MODERADOR DE KICK ====== */
+    .kick-mod { margin-top: 6px; padding: 8px; border: 1px solid #3a3a44; border-radius: 6px; }
+    .kick-mod[hidden] { display: none; }
+    .kick-mod-titulo { font-size: 11px; color: var(--verde); margin-bottom: 6px; }
+    .kick-mod input {
+      width: 100%; padding: 6px 8px; margin-bottom: 6px; border-radius: 6px;
+      border: 1px solid #3a3a44; background: #0e0e10; color: var(--texto); font: inherit; font-size: 12px;
+    }
+    .kick-mod-botones { display: flex; flex-wrap: wrap; gap: 4px; }
+    .kick-mod-botones button {
+      flex: 1 1 auto; padding: 5px 6px; border: 0; border-radius: 5px; background: #2f2f35;
+      color: var(--texto); font: inherit; font-size: 12px; cursor: pointer;
+    }
+    .kick-mod-botones button:hover { filter: brightness(1.3); }
+    .kick-mod-botones .ban { background: #8b1e1e; color: #fff; }
+    .kick-mod-botones button:disabled { opacity: .6; cursor: default; }
     /* Etiqueta pequeña encima del chat de arriba en la pestaña Todo */
     .etiqueta { display: none; font-size: 11px; padding: 4px 8px 0; }
     #caja-twitch .etiqueta { color: #bf94ff; }
@@ -298,10 +347,33 @@
           <div class="kick-escribir">
             <button class="kick-conectar" id="kick-conectar">Conectar con Kick para escribir</button>
             <form class="kick-form" id="kick-form" hidden>
+              <!-- Panel de emotes (se abre con el botón de la carita) -->
+              <div class="emotes" id="emotes" hidden>
+                <input id="emotes-buscar" placeholder="Buscar emote" autocomplete="off">
+                <div class="emotes-grupos">
+                  <button type="button" class="activa" data-grupo="Global">Kick</button>
+                  <button type="button" data-grupo="Emojis">Emojis</button>
+                </div>
+                <div class="emotes-rejilla" id="emotes-rejilla"></div>
+              </div>
               <input id="kick-texto" maxlength="500" placeholder="Enviar un mensaje en Kick" autocomplete="off">
+              <button type="button" class="kick-emote-btn" id="kick-emote-btn" aria-label="Emotes" title="Emotes">☺</button>
               <button type="submit" id="kick-enviar">Chatear</button>
             </form>
             <div class="kick-info" id="kick-info"></div>
+
+            <!-- Panel de moderador (solo para quien active el modo moderador) -->
+            <div class="kick-mod" id="kick-mod" hidden>
+              <div class="kick-mod-titulo">Modo moderador de Kick</div>
+              <input id="kick-mod-usuario" placeholder="Nombre de usuario de Kick" autocomplete="off">
+              <div class="kick-mod-botones">
+                <button type="button" data-tipo="timeout" data-minutos="1">Timeout 1 min</button>
+                <button type="button" data-tipo="timeout" data-minutos="10">10 min</button>
+                <button type="button" data-tipo="timeout" data-minutos="60">1 h</button>
+                <button type="button" data-tipo="ban" class="ban">Ban</button>
+                <button type="button" data-tipo="unban">Quitar ban</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -391,21 +463,35 @@
     }
 
     // Muestra "Conectar" o la caja de escribir, según si el viewer está conectado
-    function pintarKick(error) {
+    // ¿Ha activado el modo moderador? (concedió el permiso de moderación)
+    function esMod(s) { return !!s && (s.scope || '').includes('moderation:ban'); }
+
+    function enlace(texto, alPulsar) {
+      const a = document.createElement('a'); a.href = '#'; a.textContent = texto;
+      a.addEventListener('click', ev => { ev.preventDefault(); alPulsar(); });
+      return a;
+    }
+
+    // tipo: 'error' (rojo) o 'bien' (verde) para el mensaje opcional
+    function pintarKick(mensaje, tipo) {
       const s = leerSesion();
       kConectar.hidden = !!s;
       kForm.hidden = !s;
+      document.getElementById('kick-mod').hidden = !esMod(s);
+      if (!s) document.getElementById('emotes').hidden = true;
       kInfo.textContent = '';
-      if (error) {
-        const e = document.createElement('span'); e.className = 'error'; e.textContent = error;
+      if (mensaje) {
+        const e = document.createElement('span'); e.className = tipo || 'error'; e.textContent = mensaje;
         kInfo.appendChild(e);
       } else if (s) {
         kInfo.append('Conectado como ');
         const b = document.createElement('b'); b.textContent = s.nombre || 'tu cuenta'; kInfo.appendChild(b);
         kInfo.append(' · ');
-        const salir = document.createElement('a'); salir.href = '#'; salir.textContent = 'desconectar';
-        salir.addEventListener('click', ev => { ev.preventDefault(); guardarSesion(null); pintarKick(); });
-        kInfo.appendChild(salir);
+        kInfo.appendChild(enlace('desconectar', () => { guardarSesion(null); pintarKick(); }));
+        if (!esMod(s)) {
+          kInfo.append(' · ');
+          kInfo.appendChild(enlace('modo moderador', () => conectar(PERMISOS_MOD)));
+        }
       }
     }
 
@@ -413,8 +499,14 @@
     function b64url(bytes) { return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
     function aleatorio(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return b64url(a); }
 
+    // Permisos que se piden a Kick. Los de moderador SOLO a quien pulse "modo moderador".
+    const PERMISOS = 'user:read chat:write';
+    const PERMISOS_MOD = 'user:read chat:write moderation:ban';
+
     // Botón "Conectar con Kick": abre la pantalla oficial de Kick
-    kConectar.addEventListener('click', async () => {
+    kConectar.addEventListener('click', () => conectar(PERMISOS));
+
+    async function conectar(scope) {
       // La ventanita se abre YA (si se abre más tarde, el navegador la bloquea)
       const ventana = window.open('', 'kick-login', 'width=500,height=720');
       const verifier = aleatorio(48), state = aleatorio(16);
@@ -422,10 +514,10 @@
       try { localStorage.setItem('fefi-kick-pkce', JSON.stringify({ verifier, state })); } catch (e) {}
       const url = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
         response_type: 'code', client_id: KICK.clientId, redirect_uri: KICK.redirect,
-        scope: 'user:read chat:write', code_challenge: b64url(hash), code_challenge_method: 'S256', state
+        scope, code_challenge: b64url(hash), code_challenge_method: 'S256', state
       });
       if (ventana) ventana.location = url; else location.href = url; // si se bloqueó la ventanita, va en esta pestaña
-    });
+    }
 
     // Cuando la ventanita termina, guarda la conexión y esta página se entera sola
     window.addEventListener('storage', e => { if (e.key === 'fefi-kick') pintarKick(); });
@@ -445,7 +537,8 @@
       if (forzar || Date.now() > s.caduca - 60000) {
         const r = await pedir({ accion: 'renovar', refresh_token: s.refresh, nombre: s.nombre });
         if (!r.ok) { guardarSesion(null); pintarKick('Tu conexión con Kick ha caducado. Vuelve a conectar.'); return null; }
-        s = r.j; guardarSesion(s);
+        s = Object.assign({}, r.j, { scope: r.j.scope || s.scope }); // conserva los permisos
+        guardarSesion(s);
       }
       return s;
     }
@@ -459,13 +552,14 @@
       try {
         let s = await sesionValida(false);
         if (!s) return;
-        let r = await pedir({ accion: 'enviar', token: s.access, content: texto });
+        const contenido = conEmotes(texto);    // "KEKW" → emote de verdad
+        let r = await pedir({ accion: 'enviar', token: s.access, content: contenido });
         if (r.status === 401) {                 // token caducado: se renueva y se reintenta una vez
           s = await sesionValida(true);
           if (!s) return;
-          r = await pedir({ accion: 'enviar', token: s.access, content: texto });
+          r = await pedir({ accion: 'enviar', token: s.access, content: contenido });
         }
-        if (r.ok) { kTexto.value = ''; pintarKick(); }
+        if (r.ok) { kTexto.value = ''; document.getElementById('emotes').hidden = true; pintarKick(); }
         else pintarKick(r.j.error || 'No se pudo enviar el mensaje.');
       } catch (e) {
         pintarKick('No se pudo contactar con el servidor.');
@@ -474,6 +568,100 @@
         kTexto.focus();
       }
     });
+
+    // ====== EMOTES DE KICK ======
+    // Lista sacada de Kick (número:nombre). Si algún día añades emotes propios a tu canal de Kick,
+    // se añaden aquí con el mismo formato (te ayudo a sacar los números).
+    const LISTA_EMOTES = {
+      Global: '3753119:asmonSmash,5380971:AURAPULSE,5756662:AYAYA,5882722:BANG,4147910:BBoomer,39251:beeBobble,37217:Bwop,5756614:CaptFail,4148144:catblobDance,4147900:catKISS,37218:Clap,5756616:DanceDance,5756666:DonoWall,4147914:duckPls,3645850:EDDIE,39265:EDMusiC,5756668:EZ,5756511:FLASHBANG,39402:Flowie,37243:gachiGASM,5756671:GIGACHAD,4055795:GnomeDisco,4148076:HaHaa,5273247:highCortisol,4148074:HYPERCLAP,5452913:JudgeJackson,4147902:KEKBye,37225:KEKLEO,37226:KEKW,5470844:kickclassic,5339426:kickDrops,5756621:kkHuh,5273243:lowCortisol,37227:LULW,4148128:mericCat,5756381:modCheck,5273241:MOGGED,5756628:MuteD,5756504:NODDERS,5756602:NugTime,4055796:ODAJAM,37229:OOOO,5756623:OuttaPocket,4147892:PatrickBoo,37232:PeepoClap,37245:peepoDJ,5756675:peepoRiot,37233:PogU,37230:POLICE,5756627:politeCat,4147888:ppJedi,37234:Prayge,5756644:ratJAM,4148081:Sadge,5756676:SenpaiWhoo,5380973:shoulderRoll,5755651:SIT,5756632:SUSSY,37236:ThisIsFine,5756677:TriKool,3645849:TRUEING,4147884:vibePls,5756678:WeirdChamp,5756680:WeSmart',
+      Emojis: '1730752:emojiAngel,1730753:emojiAngry,1579033:emojiAstonished,1730754:emojiAwake,1579036:emojiBlowKiss,1730755:emojiBubbly,1730756:emojiCheerful,1730758:emojiClown,1730759:emojiCool,1730760:emojiCrave,1730761:emojiCry,1579040:emojiCrying,1730762:emojiCurious,1730765:emojiCute,1730767:emojiDead,1730768:emojiDevil,1579041:emojiDisappoint,1579042:emojiDisguise,1730769:emojiDJ,1730770:emojiDown,1579044:emojiEnraged,1579045:emojiExcited,1579054:emojiEyeRoll,1730772:emojiFire,1730774:emojiGamer,1730775:emojiGlass,1730776:emojiGoofy,1730782:emojiGramps,1579046:emojiGrimacing,1730785:emojiGrin,1730786:emojiGrumpy,1730787:emojiHappy,1579047:emojiHeartEyes,1730788:emojiHmm,4200908:emojiHydrate,1730789:emojiKing,1730790:emojiKiss,1730791:emojiLady,1579050:emojiLaughing,1730792:emojiLoading,1730794:emojiLol,1730796:emojiMan,1579051:emojiMoneyEyes,1730798:emojiNo,1730799:emojiOof,1730800:emojiOooh,1730802:emojiOuch,1579052:emojiPleading,1730803:emojiRich,1730807:emojiShocked,1730825:emojiSleep,1730827:emojiSmart,1579055:emojiSmerking,1579057:emojiSmiling,1730829:emojiSorry,1730830:emojiStare,1579058:emojiStarEyes,1579059:emojiSwearing,1579061:emojiUnamused,1579062:emojiVomiting,1730831:emojiWink,1579038:emojiXEyes,1730834:emojiYay,1730835:emojiYes,1730839:emojiYuh,1730840:emojiYum'
+    };
+    const EMOTES = {};      // grupo -> [{id, nombre}]
+    const POR_NOMBRE = {};  // nombre -> id
+    for (const grupo in LISTA_EMOTES) {
+      EMOTES[grupo] = LISTA_EMOTES[grupo].split(',').map(par => {
+        const [id, nombre] = par.split(':');
+        POR_NOMBRE[nombre] = id;
+        return { id, nombre };
+      });
+    }
+
+    // Convierte las palabras que son emotes en el código que entiende Kick: [emote:ID:NOMBRE]
+    function conEmotes(texto) {
+      return texto.split(/(\s+)/).map(p => POR_NOMBRE[p] ? `[emote:${POR_NOMBRE[p]}:${p}]` : p).join('');
+    }
+
+    const panelEmotes = document.getElementById('emotes');
+    const rejilla = document.getElementById('emotes-rejilla');
+    const buscar = document.getElementById('emotes-buscar');
+    let grupoActual = 'Global';
+
+    function pintarEmotes() {
+      const filtro = buscar.value.trim().toLowerCase();
+      // Si se busca algo, busca en todos los grupos; si no, enseña el grupo elegido
+      const lista = filtro
+        ? Object.values(EMOTES).flat().filter(e => e.nombre.toLowerCase().includes(filtro))
+        : EMOTES[grupoActual];
+      rejilla.textContent = '';
+      for (const e of lista) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.title = e.nombre;
+        const img = document.createElement('img');
+        img.src = `https://files.kick.com/emotes/${e.id}/fullsize`; img.alt = e.nombre; img.loading = 'lazy';
+        b.appendChild(img);
+        b.addEventListener('click', () => {
+          // Mete el nombre del emote en el texto (al enviar se convierte en emote)
+          const antes = kTexto.value;
+          kTexto.value = antes + (antes && !antes.endsWith(' ') ? ' ' : '') + e.nombre + ' ';
+          kTexto.focus();
+        });
+        rejilla.appendChild(b);
+      }
+    }
+
+    document.getElementById('kick-emote-btn').addEventListener('click', () => {
+      panelEmotes.hidden = !panelEmotes.hidden;
+      if (!panelEmotes.hidden) { pintarEmotes(); buscar.focus(); }
+    });
+    buscar.addEventListener('input', pintarEmotes);
+    document.querySelectorAll('.emotes-grupos button').forEach(b => b.addEventListener('click', () => {
+      grupoActual = b.dataset.grupo;
+      document.querySelectorAll('.emotes-grupos button').forEach(x => x.classList.toggle('activa', x === b));
+      buscar.value = ''; pintarEmotes();
+    }));
+    // Cerrar el panel con Escape o pulsando fuera
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') panelEmotes.hidden = true; });
+    document.addEventListener('click', ev => {
+      if (!panelEmotes.hidden && !kForm.contains(ev.target)) panelEmotes.hidden = true;
+    });
+
+    // ====== MODO MODERADOR DE KICK ======
+    const modUsuario = document.getElementById('kick-mod-usuario');
+    document.querySelectorAll('.kick-mod-botones button').forEach(b => b.addEventListener('click', async () => {
+      const usuario = modUsuario.value.trim().replace(/^@/, '');
+      if (!usuario) { pintarKick('Escribe primero el nombre de usuario.'); return; }
+      const tipo = b.dataset.tipo;
+      const que = tipo === 'ban' ? 'Ban a ' + usuario
+                : tipo === 'unban' ? 'Quitar el ban a ' + usuario
+                : 'Timeout de ' + b.textContent.replace('Timeout ', '') + ' a ' + usuario;
+      if (tipo === 'ban' && !confirm('¿Seguro? ' + que + ' (permanente)')) return;
+
+      const botones = document.querySelectorAll('.kick-mod-botones button');
+      botones.forEach(x => x.disabled = true);
+      try {
+        let s = await sesionValida(false);
+        if (!s) return;
+        const datos = { accion: 'moderar', token: s.access, usuario, tipo, minutos: b.dataset.minutos };
+        let r = await pedir(datos);
+        if (r.status === 401) { s = await sesionValida(true); if (!s) return; datos.token = s.access; r = await pedir(datos); }
+        if (r.ok) { pintarKick('Hecho: ' + que, 'bien'); modUsuario.value = ''; setTimeout(() => pintarKick(), 4000); }
+        else pintarKick(r.j.error || 'No se pudo hacer la acción.');
+      } catch (e) {
+        pintarKick('No se pudo contactar con el servidor.');
+      } finally {
+        botones.forEach(x => x.disabled = false);
+      }
+    }));
 
     pintarKick();
   </script>
